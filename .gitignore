@@ -5,3 +5,6 @@ temp.json
 notes.md
 .vscode
 *.pyc
+test.py
+credentials
+*_key.json

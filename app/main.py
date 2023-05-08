@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 import json
+import pprint
 
 from typing import Any
 
@@ -14,15 +15,22 @@ from typing import Any
 from .helper import read_files_from_directory, find_potential_metadata
 from .global_vars import MUSIC_FILE_EXTENSIONS
 from .config import settings
-from .database import get_db
+from .database import get_db, SQLSongMetadata
 # from .models import SongMetadata
 from .schemas import *
-from .models import *
+# from .models import *
 
 # needed for sending to gsheets:
 # pyright: reportMissingTypeStubs=false
 import gspread
 
+# logger set up:
+from .log import get_logger
+LOG = get_logger(__name__)
+LOG.debug("a debug message")
+# pp = pprint.PrettyPrinter(indent=4)
+
+## program start:
 app = FastAPI()
 
 
@@ -118,7 +126,7 @@ async def files_dropped_on_gui(new_tracks: DBSRDroppedFiles, db: Session = Depen
 
 # TODO: Formalize a type for req instead of using Request, going to be a list of metadata objects, example in docstring
 # @app.post("/submit_song", response_model=ReturnType)
-@app.post("/submit_metadata", response_model=str)
+@app.post("/submit_metadata", response_model=Any)
 async def submit_metadata(req: Request, db: Session = Depends(get_db)):
     """
     example input:
@@ -136,13 +144,13 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
     """
     # first submit it to the db to get the song id.
     metadatas = await req.json()
-    print(f'{metadatas=}')
-    return "success"
-
-    # TODO: Update type
+    # LOG.debug(f'{pp.pformat(metadatas)=}')
+    LOG.info(f'{pprint.pp(metadatas)=}')
 
     # creating a new list of metadata items that are not in db
+    # and a list of items that won't be added because they're already in the db
     new_metadatas: Any = []
+    old_metadatas: Any = []
     for meta in metadatas:
         # TODO! Improve this query.
         query = db.query(SQLSongMetadata).filter(
@@ -150,15 +158,14 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
                 SQLSongMetadata.title == meta['title'])
         )
         print(f'{query=}')
-        entry = query.first()
-        if entry:
-            print(f'Cannot add, already an entry in db: {entry=}')
-            continue
+        if query.first():
+            print(f'Cannot add, already an entry in db: {query.first()=}')
+            old_metadatas.append(meta)
         else:
             new_metadatas.append(meta)
+    
     # adding new meta to the db
     for meta in new_metadatas:
-
         new_entry = SQLSongMetadata(
             artist = meta['artist'],
             title = meta['title'],
@@ -182,5 +189,8 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
     #     artist, title = entry['artist'], entry['title']
     #     print(f'sending {title=} {artist=}')
     #     sheet.append_row([artist, title])  # type: ignore
-
-    return 'success'
+    resp = {
+        'added' : new_metadatas,
+        'skipped': old_metadatas
+    }
+    return resp

@@ -8,3 +8,4 @@ notes.md
 test.py
 credentials
 *_key.json
+*.log

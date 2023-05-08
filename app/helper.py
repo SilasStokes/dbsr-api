@@ -3,7 +3,6 @@ import os
 import mutagen
 
 # local imports:
-from .models import *
 from .schemas import *
 from .global_vars import *
 

@@ -8,4 +8,11 @@ Triggers have been set up in the google sheet that tracks our music library, spe
 
 ## Schema details:
 
-## 
+## Files:
+- `models.py` : SQLAlchemy classes (this )
+- `schemas.py` : Pydantic dataclasses
+- `database.py` :  Database connection initialization and db connection provider
+- `config.py` : read environment variables from .env file into useable dataclass
+- `main.py` : Routes for API
+- `helper.py` : implementation details 
+- `globals.py` : Meant for program constants like ID3 keys

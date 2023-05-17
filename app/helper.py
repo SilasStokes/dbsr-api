@@ -1,4 +1,5 @@
 import os
+from shutil import which
 from typing import Any
 import mutagen
 from mutagen.id3 import (
@@ -11,6 +12,7 @@ from mutagen.id3 import (
 )
 import shutil
 import acoustid
+import subprocess
 
 from app.database import SQLSongMetadata
 # local imports:
@@ -24,11 +26,9 @@ LOG.debug("a debug message")
 
 def read_files_from_directory(dirpath: str) -> list[str]:
     file_paths: list[str] = []
-
     for root, _, files in os.walk(dirpath):
         for f in files:
             file_paths.append(f'{root}\\{f}')
-
     return file_paths
 
 
@@ -96,7 +96,7 @@ def _parse_metadata_from_id3(path: str) -> Metadata:
         # usr = input('Press enter: ')
 
     # type: ignore
-    return Metadata(artist=artist, title=title, album=album, album_artist=album_artist, acoustid=acoustid, path=path)
+    return Metadata(artist=artist, title=title, album=album, album_artist=album_artist, acoustid=acoustid, path=path) # type: ignore
 
 
 def find_potential_metadata(path: str) -> PotentialMetadatas:
@@ -113,9 +113,6 @@ def move(src: str, dst: str):
 
         # copy file
     shutil.copy2(src=src, dst=dst)
-
-# [ ]
-
 
 def add_file_to_musiclib(meta: Any) -> None:
     """
@@ -177,7 +174,25 @@ def write_metadata_to_mp3(meta: Any) -> None:
 
     tags.save(meta['path']) # type: ignore
 
+def convert_m4a_to_mp3(path: str, delete_input: bool = True) -> str:
+    """
+    used `choco install ffmpeg-full` 
+    """
+    if not which('ffmpeg'):
+        raise Exception('ffmpeg not installed')
 
+    output = os.path.splitext(path)[0] + '.mp3'
+
+    try:
+        subprocess.call(['ffmpeg', '-y', '-i', path, output]) 
+
+        if delete_input:
+            os.remove(path)
+    except Exception as e:
+        LOG.error(f'error: {e}')
+        raise e
+    
+    return output
 
 def send_SQLSongMetadata_to_googledrive(meta: SQLSongMetadata) -> None:
     ...

@@ -9,3 +9,5 @@ test.py
 credentials
 *_key.json
 *.log
+typings
+api.log.*

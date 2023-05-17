@@ -16,3 +16,6 @@ id3_album_artist_key = 'TPE2'
 
     
 MUSIC_FILE_EXTENSIONS = ('.mp3', '.MP3', '.wav', '.WAV', '.m4a', '.cda')
+
+MUSIC_LIB_PATH = f'C:\\Users\\DBS Radio Intern\\musicdb'
+

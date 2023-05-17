@@ -10,7 +10,7 @@ from .config import settings
 SQLALCHEMY_DATABASE_URL = f'postgresql://{settings.database_username}:{settings.database_password}@{settings.database_hostname}:{settings.database_port}/{settings.database_name}'
 
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
 
 # exterior imports:
 from typing import Optional
@@ -40,6 +40,7 @@ class SQLSongMetadata(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str]
     artist: Mapped[Optional[str]]
+    file_location: Mapped[str]
     def __repr__(self) -> str:
         return f"SongMetadata({self.id=}, {self.title=}, {self.artist=})"
     

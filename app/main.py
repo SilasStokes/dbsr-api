@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 # fastapi 
 from fastapi import FastAPI, Body, Request, Depends
@@ -9,10 +10,16 @@ from pydantic import BaseModel
 import json
 import pprint
 
-from typing import Any
+
 
 # relative imports
-from .helper import read_files_from_directory, find_potential_metadata
+from .helper import (
+        add_file_to_musiclib, 
+        generate_acoustid, 
+        read_files_from_directory, 
+        find_potential_metadata,
+        write_metadata_to_file
+    )
 from .global_vars import MUSIC_FILE_EXTENSIONS
 from .config import settings
 from .database import get_db, SQLSongMetadata
@@ -163,12 +170,31 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
             old_metadatas.append(meta)
         else:
             new_metadatas.append(meta)
+
+    # [ ] add the acoustid to the metadata.
+    for meta in new_metadatas:
+        meta['acoustid'] = generate_acoustid(meta['path'])
+    
+    for meta in new_metadatas:
+        write_metadata_to_file(meta)
+
+    # move them to their new path:
+    for meta in new_metadatas:
+        try:
+            add_file_to_musiclib(meta)
+        except Exception as e:
+            LOG.debug(f'Failed to move {meta} to a new destination. {e=}')
+            # TODO: remove the failed meta from the list. 
+    
+    
     
     # adding new meta to the db
     for meta in new_metadatas:
+        LOG.debug(f'meta new path : {meta["path"]=}')
         new_entry = SQLSongMetadata(
             artist = meta['artist'],
             title = meta['title'],
+            file_location = meta['path']
             # acoustid=meta.acoustid,
             # album=meta.album,
             # album_artist=meta.album_artist,
@@ -177,18 +203,23 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
         db.add(new_entry)
         db.commit()
         db.refresh(new_entry)
+        meta['id'] = new_entry.id
         print(f'NEW ENTRY: {new_entry.id}')
+
+        # add the new entry to the google drive:
+        
     # #     query = db.query(SongMetadata).filter(SongMetadata.id == edit.row.id)
 
-    # key_path = 'C:\\Users\\DBS Radio Intern\\code\\pyapi\\app\\credentials\\drive_api_key.json'
-    # gc = gspread.service_account(filename=key_path)
-    # sheet = gc.open('test').sheet1  # type: ignore
+    key_path = 'C:\\Users\\DBS Radio Intern\\code\\pyapi\\app\\credentials\\drive_api_key.json'
+    gc = gspread.service_account(filename=key_path) # type: ignore
+    sheet = gc.open('test').sheet1  # type: ignore
 
-    # # rows: list[list[str]] = []
-    # for entry in metadatas:
-    #     artist, title = entry['artist'], entry['title']
-    #     print(f'sending {title=} {artist=}')
-    #     sheet.append_row([artist, title])  # type: ignore
+    # rows: list[list[str]] = []
+    for meta in metadatas:
+        id, artist, title = meta['id'], meta['artist'], meta['title']
+        print(f'sending {title=} {artist=}')
+        sheet.append_row([id, artist, title])  # type: ignore
+
     resp = {
         'added' : new_metadatas,
         'skipped': old_metadatas

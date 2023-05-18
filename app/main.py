@@ -14,11 +14,12 @@ import pprint
 
 # relative imports
 from .helper import (
-        add_file_to_musiclib, 
+        add_file_to_musiclib,
+        convert_m4a_to_mp3, 
         generate_acoustid, 
         read_files_from_directory, 
         find_potential_metadata,
-        write_metadata_to_file
+        write_metadata_to_mp3
     )
 from .global_vars import MUSIC_FILE_EXTENSIONS
 from .config import settings
@@ -171,12 +172,22 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
         else:
             new_metadatas.append(meta)
 
-    # [ ] add the acoustid to the metadata.
+    # [x] convert file to mp3 data type (.m4a has a different metadata container, also nextKast explicitly says it works with mp3's)
+    for meta in new_metadatas:
+        if meta['path'].endswith('.mp3'):
+            continue
+        if meta['path'].endswith('.m4a'):
+            meta['path'] = convert_m4a_to_mp3(path=meta['path'], delete_input=False)
+        else:
+            LOG.error('INVALID FILE EXTENSION')
+        
+
+    # [x] add the acoustid to the metadata.
     for meta in new_metadatas:
         meta['acoustid'] = generate_acoustid(meta['path'])
     
     for meta in new_metadatas:
-        write_metadata_to_file(meta)
+        write_metadata_to_mp3(meta)
 
     # move them to their new path:
     for meta in new_metadatas:
@@ -185,8 +196,6 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
         except Exception as e:
             LOG.debug(f'Failed to move {meta} to a new destination. {e=}')
             # TODO: remove the failed meta from the list. 
-    
-    
     
     # adding new meta to the db
     for meta in new_metadatas:
@@ -208,8 +217,6 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
 
         # add the new entry to the google drive:
         
-    # #     query = db.query(SongMetadata).filter(SongMetadata.id == edit.row.id)
-
     key_path = 'C:\\Users\\DBS Radio Intern\\code\\pyapi\\app\\credentials\\drive_api_key.json'
     gc = gspread.service_account(filename=key_path) # type: ignore
     sheet = gc.open('test').sheet1  # type: ignore
@@ -218,7 +225,7 @@ async def submit_metadata(req: Request, db: Session = Depends(get_db)):
     for meta in metadatas:
         id, artist, title = meta['id'], meta['artist'], meta['title']
         print(f'sending {title=} {artist=}')
-        sheet.append_row([id, artist, title])  # type: ignore
+        sheet.append_row([id, artist, title], table_range='A1')  # type: ignore
 
     resp = {
         'added' : new_metadatas,
